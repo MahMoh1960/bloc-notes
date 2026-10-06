@@ -56,6 +56,15 @@ small{color:var(--mute)}
 <input id="rate" type="range" min="0.6" max="1.5" step="0.05" value="1"></div>
 </div>
 
+<label for="sv">Voix de l'appareil (sans clé)</label>
+<select id="sv"></select>
+<div class="row" style="margin-top:10px">
+<button id="play" type="button">▶ Écouter</button>
+<button id="pause" type="button" class="alt">⏸ Pause</button>
+<button id="stop" type="button" class="alt">⏹ Arrêter</button>
+</div>
+<small>Cette écoute n'est pas enregistrable en fichier par le navigateur.</small>
+
 <label for="key">Clé API Google Cloud</label>
 <input id="key" type="password" autocomplete="off" placeholder="AIza…">
 <small>La clé reste dans ce navigateur et n'est envoyée qu'à Google.</small>
@@ -165,6 +174,51 @@ $('go').onclick = async () => {
     $('go').disabled = false; $('pg').hidden = true;
   }
 };
+
+// ---- Écoute avec les voix de l'appareil (sans clé) ----
+const syn = window.speechSynthesis;
+let run = 0;
+function fillVoices() {
+  if (!syn) return;
+  const code = $('voice').value.split('|')[0].slice(0, 2);
+  const vs = syn.getVoices().filter(v => v.lang.toLowerCase().startsWith(code));
+  $('sv').innerHTML = '';
+  if (!vs.length) { const o = document.createElement('option'); o.value = ''; o.textContent = 'Voix par défaut'; $('sv').append(o); }
+  vs.forEach(v => { const o = document.createElement('option'); o.value = v.voiceURI; o.textContent = v.name + ' (' + v.lang + ')'; $('sv').append(o); });
+}
+if (syn) { fillVoices(); syn.onvoiceschanged = fillVoices; }
+$('voice').addEventListener('change', fillVoices);
+
+function pieces(t) {
+  return t.replace(/\r/g, '').split(/(?<=[.!?؟…\n])\s*/).flatMap(s => {
+    const r = [];
+    while (s.length > 220) { let c = s.slice(0, 220); const k = c.lastIndexOf(' '); if (k > 80) c = c.slice(0, k); r.push(c); s = s.slice(c.length); }
+    r.push(s); return r;
+  }).filter(s => s.trim());
+}
+$('play').onclick = () => {
+  if (!syn) return msg('Votre navigateur ne sait pas lire le texte à voix haute.', true);
+  if (syn.paused) { syn.resume(); return; }
+  const text = $('txt').value.trim();
+  if (!text) return msg('Ajoutez un texte à écouter.', true);
+  syn.cancel();
+  const my = ++run;
+  const v = syn.getVoices().find(x => x.voiceURI === $('sv').value);
+  const q = pieces(text); let i = 0;
+  const next = () => {
+    if (my !== run) return;
+    if (i >= q.length) { msg('Lecture terminée.'); return; }
+    const u = new SpeechSynthesisUtterance(q[i++]);
+    if (v) { u.voice = v; u.lang = v.lang; } else u.lang = $('voice').value.split('|')[0];
+    u.rate = Number($('rate').value);
+    u.onend = next;
+    u.onerror = e => { if (my === run && e.error !== 'canceled' && e.error !== 'interrupted') msg('Erreur de lecture : ' + e.error, true); };
+    syn.speak(u);
+  };
+  msg('Lecture en cours…'); next();
+};
+$('pause').onclick = () => { if (syn) syn.pause(); };
+$('stop').onclick = () => { run++; if (syn) syn.cancel(); msg(''); };
 </script>
 </body>
 </html>
