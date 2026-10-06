@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#3a5bd9">
 <title>Texte en MP3</title>
+<link rel="manifest" href="manifest-lecteur.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
 :root{--bg:#f4f6fc;--card:#fff;--ink:#1b2340;--mute:#5d6685;--line:#d5dbee;--acc:#3a5bd9;--on:#fff;--err:#b3261e}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#12162a;--card:#1b2140;--ink:#e8ecfb;--mute:#9aa3c7;--line:#2e3659;--acc:#7c93f5;--on:#10152c;--err:#ff8a80}}
@@ -220,6 +223,7 @@ $('play').onclick = () => {
 };
 $('pause').onclick = () => { if (syn) syn.pause(); };
 $('stop').onclick = () => { run++; if (syn) syn.cancel(); msg(''); };
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 </script>
 </body>
 </html>
