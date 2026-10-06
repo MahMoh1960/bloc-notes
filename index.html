@@ -44,7 +44,7 @@ select{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(
 </div>
 <div id="v2" hidden>
 <header><button id="back">←</button><h1></h1><button id="clean" data-t="clean" aria-label="Nettoyer">🧹</button><button id="del" data-t="del">🗑</button><button id="save" class="p" data-i="save">Enregistrer .txt</button></header>
-<div id="alr"><button data-a="left" data-t="aL" aria-label="left"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:block"><path d="M15 15H3v2h12v-2zm0-8H3v2h12V7zM3 13h18v-2H3v2zm0 8h18v-2H3v2zM3 3v2h18V3H3z"/></svg></button><button data-a="center" data-t="aC" aria-label="center"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:block"><path d="M7 15v2h10v-2H7zm-4 6h18v-2H3v2zm0-8h18v-2H3v2zm4-6v2h10V7H7zM3 3v2h18V3H3z"/></svg></button><button data-a="right" data-t="aR" aria-label="right"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:block"><path d="M3 21h18v-2H3v2zm6-4h12v-2H9v2zm-6-4h18v-2H3v2zm6-4h12V7H9v2zM3 3v2h18V3H3z"/></svg></button></div>
+<div style="text-align:center;padding:8px 12px 0"><button id="tts">🔊 MP3</button></div><div id="alr"><button data-a="left" data-t="aL" aria-label="left"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:block"><path d="M15 15H3v2h12v-2zm0-8H3v2h12V7zM3 13h18v-2H3v2zm0 8h18v-2H3v2zM3 3v2h18V3H3z"/></svg></button><button data-a="center" data-t="aC" aria-label="center"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:block"><path d="M7 15v2h10v-2H7zm-4 6h18v-2H3v2zm0-8h18v-2H3v2zm4-6v2h10V7H7zM3 3v2h18V3H3z"/></svg></button><button data-a="right" data-t="aR" aria-label="right"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:block"><path d="M3 21h18v-2H3v2zm6-4h12v-2H9v2zm-6-4h18v-2H3v2zm6-4h12V7H9v2zM3 3v2h18V3H3z"/></svg></button></div>
 <div id="wr"><span data-i="wl">mots/ligne</span><select id="wn"><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select><button id="cut" class="p" data-i="cut">Couper les lignes</button><button id="undo" hidden data-t="undo">↩</button></div>
 <main><input id="ti" dir="auto" data-p="ttl" autocomplete="off"><textarea id="ta" dir="auto" data-p="ph"></textarea></main>
 </div>
@@ -62,6 +62,7 @@ if(!T[lg])lg='fr';
 const t=k=>T[lg][k];
 try{notes=JSON.parse(ls.g('bn')||'[]')}catch(e){notes=[]}
 const persist=()=>ls.s('bn',JSON.stringify(notes));
+$('#tts').onclick=()=>{upd();ls.s('tts-text',cur.text);ls.s('tts-title',cur.title);ls.s('tts-lang',lg);location.href='lecteur-mp3.html'};  
 if(window.claude)window.claude.use('downloads').then(d=>dl=d).catch(()=>{});
 const th=ls.g('th');if(th)document.documentElement.dataset.theme=th;
 function toast(m){const e=$('#toast');e.textContent=m;e.style.opacity=1;setTimeout(()=>e.style.opacity=0,1800)}
