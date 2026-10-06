@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#3a5bd9">
+<title>Texte en MP3</title>
+<style>
+:root{--bg:#f4f6fc;--card:#fff;--ink:#1b2340;--mute:#5d6685;--line:#d5dbee;--acc:#3a5bd9;--on:#fff;--err:#b3261e}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#12162a;--card:#1b2140;--ink:#e8ecfb;--mute:#9aa3c7;--line:#2e3659;--acc:#7c93f5;--on:#10152c;--err:#ff8a80}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+main{max-width:640px;margin:0 auto;padding:16px}
+h1{font-size:1.4rem;margin:8px 0 16px}
+label{display:block;font-size:.85rem;color:var(--mute);margin:14px 0 4px}
+textarea,input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit}
+textarea{min-height:200px;resize:vertical}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.row{display:flex;gap:10px}.row>*{flex:1}
+button,.btn{display:inline-block;padding:12px 16px;border:0;border-radius:8px;background:var(--acc);color:var(--on);font:inherit;font-weight:600;text-align:center;text-decoration:none;cursor:pointer}
+button.alt{background:transparent;color:var(--acc);border:1px solid var(--acc)}
+button:disabled{opacity:.5}
+#go{width:100%;margin-top:18px;padding:14px}
+progress{width:100%;height:10px;margin-top:14px}
+#msg{margin:10px 0;color:var(--mute);min-height:1.5em}
+#msg.err{color:var(--err)}
+#out{margin-top:10px}
+audio{width:100%;margin-bottom:10px}
+small{color:var(--mute)}
+</style>
+</head>
+<body>
+<main>
+<p><a href="./">← Bloc-notes</a></p>
+<h1>Texte en MP3</h1>
+
+<label for="file">Fichier .txt</label>
+<input id="file" type="file" accept=".txt,text/plain">
+
+<label for="txt">Texte à lire</label>
+<textarea id="txt" placeholder="Ouvrez un fichier .txt ou collez votre texte ici"></textarea>
+<small id="count"></small>
+
+<label for="voice">Voix</label>
+<select id="voice">
+<option value="fr-FR|fr-FR-Neural2-A">Français, femme</option>
+<option value="fr-FR|fr-FR-Neural2-B">Français, homme</option>
+<option value="ar-XA|ar-XA-Wavenet-A">Arabe, femme</option>
+<option value="ar-XA|ar-XA-Wavenet-C">Arabe, homme</option>
+<option value="en-US|en-US-Neural2-F">Anglais, femme</option>
+</select>
+
+<div class="row">
+<div><label for="rate">Vitesse : <span id="rv">1,0</span></label>
+<input id="rate" type="range" min="0.6" max="1.5" step="0.05" value="1"></div>
+</div>
+
+<label for="key">Clé API Google Cloud</label>
+<input id="key" type="password" autocomplete="off" placeholder="AIza…">
+<small>La clé reste dans ce navigateur et n'est envoyée qu'à Google.</small>
+
+<button id="go">Créer le MP3</button>
+<progress id="pg" value="0" max="1" hidden></progress>
+<div id="msg" role="status"></div>
+<div id="out" hidden>
+<audio id="au" controls></audio>
+<a id="dl" class="btn" download="lecture.mp3">Télécharger le MP3</a>
+</div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const MAX = 4500; // octets par requête (limite Google : 5000)
+const enc = new TextEncoder();
+
+// Mémorise la clé
+try { $('key').value = localStorage.getItem('tts-key') || ''; } catch (e) {}
+
+// Note envoyée depuis le bloc-notes (bouton 🔊)
+try {
+  const t = localStorage.getItem('tts-text');
+  if (t) {
+    $('txt').value = t;
+    const ti = (localStorage.getItem('tts-title') || 'note').replace(/[\\/:*?"<>|]/g, '_');
+    $('dl').download = ti + '.mp3';
+    if (localStorage.getItem('tts-lang') === 'ar') $('voice').selectedIndex = 2;
+    localStorage.removeItem('tts-text'); localStorage.removeItem('tts-title');
+    count();
+  }
+} catch (e) {}
+
+$('file').onchange = async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  $('txt').value = await f.text();
+  $('dl').download = f.name.replace(/\.[^.]+$/, '') + '.mp3';
+  count();
+};
+$('txt').oninput = count;
+$('rate').oninput = () => $('rv').textContent = Number($('rate').value).toFixed(1).replace('.', ',');
+function count() { $('count').textContent = $('txt').value.length + ' caractères'; }
+
+// Découpe en morceaux < MAX octets, en coupant aux fins de phrase
+function split(text) {
+  const parts = text.replace(/\r/g, '').split(/(?<=[.!?؟…\n])\s*/);
+  const out = []; let cur = '';
+  for (let p of parts) {
+    while (enc.encode(p).length > MAX) { // phrase trop longue : coupe brutale
+      let cut = p.slice(0, 1500);
+      const sp = cut.lastIndexOf(' ');
+      if (sp > 500) cut = cut.slice(0, sp);
+      if (cur) { out.push(cur); cur = ''; }
+      out.push(cut); p = p.slice(cut.length);
+    }
+    if (enc.encode(cur + ' ' + p).length > MAX) { out.push(cur); cur = p; }
+    else cur = cur ? cur + ' ' + p : p;
+  }
+  if (cur.trim()) out.push(cur);
+  return out.filter(s => s.trim());
+}
+
+function msg(t, err) { $('msg').textContent = t; $('msg').className = err ? 'err' : ''; }
+
+$('go').onclick = async () => {
+  const text = $('txt').value.trim();
+  const key = $('key').value.trim();
+  if (!text) return msg('Ajoutez un texte ou ouvrez un fichier .txt.', true);
+  if (!key) return msg('Saisissez votre clé API Google Cloud.', true);
+  try { localStorage.setItem('tts-key', key); } catch (e) {}
+
+  const [lang, name] = $('voice').value.split('|');
+  const chunks = split(text);
+  const bufs = [];
+  $('go').disabled = true; $('out').hidden = true;
+  $('pg').hidden = false; $('pg').max = chunks.length; $('pg').value = 0;
+
+  try {
+    for (let i = 0; i < chunks.length; i++) {
+      msg('Partie ' + (i + 1) + ' sur ' + chunks.length + '…');
+      const r = await fetch('https://texttospeech.googleapis.com/v1/text:synthesize?key=' + encodeURIComponent(key), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input: { text: chunks[i] },
+          voice: { languageCode: lang, name },
+          audioConfig: { audioEncoding: 'MP3', speakingRate: Number($('rate').value) }
+        })
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error && j.error.message || 'Erreur ' + r.status);
+      const bin = atob(j.audioContent);
+      const u8 = new Uint8Array(bin.length);
+      for (let k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
+      bufs.push(u8);
+      $('pg').value = i + 1;
+    }
+    const blob = new Blob(bufs, { type: 'audio/mpeg' });
+    const url = URL.createObjectURL(blob);
+    $('au').src = url; $('dl').href = url; $('out').hidden = false;
+    msg('MP3 prêt (' + (blob.size / 1048576).toFixed(1).replace('.', ',') + ' Mo).');
+  } catch (e) {
+    msg('Échec : ' + e.message + ' Vérifiez la clé et que l\'API Cloud Text-to-Speech est activée.', true);
+  } finally {
+    $('go').disabled = false; $('pg').hidden = true;
+  }
+};
+</script>
+</body>
+</html>
